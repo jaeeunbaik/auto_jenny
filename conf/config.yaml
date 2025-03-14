@@ -2,18 +2,21 @@ defaults:
   - _self_
   - checkpoint: last_k
   - data: default
-  - logger: cassini
+  - logger: jaeeunbaik
   - model: default
   - optimizer: adamw
   - trainer: train
   - decode: default
 exp_name:
 exp_dir:
-num_workers: 12
-gpus: 
+num_workers: 32
+devices: 5
 slurm_job_id:
 train: True
 log_wandb: True
 infer_path:
-ckpt_path:
+ckpt_path: 
+ckpt_path_2:
 transfer_frontend:
+transfer_encoder:
+teacher_ckpt: /home/nas4/user/jaeeun/emformer/kd_avsr/LRS3/EM_AVSR_lrs3.pth

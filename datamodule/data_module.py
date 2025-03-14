@@ -51,8 +51,8 @@ class DataModule(LightningDataModule):
     def __init__(self, cfg=None):
         super().__init__()
         self.cfg = cfg
-        self.cfg.gpus = torch.cuda.device_count()
-        self.total_gpus = self.cfg.gpus * self.cfg.trainer.num_nodes
+        self.cfg.devices = torch.cuda.device_count()
+        self.total_gpus = self.cfg.devices * self.cfg.trainer.num_nodes
 
     def _dataloader(self, ds, sampler, collate_fn):
         return torch.utils.data.DataLoader(
@@ -75,7 +75,7 @@ class DataModule(LightningDataModule):
             audio_transform=AudioTransform("train"),
             video_transform=VideoTransform("train"),
         )
-        sampler = ByFrameCountSampler(train_ds, self.cfg.data.max_frames)
+        sampler = ByFrameCountSampler(train_ds, self.cfg.data.max_frames, self.cfg.data.max_sentences)
         if self.total_gpus > 1:
             sampler = DistributedSamplerWrapper(sampler)
         else:
@@ -93,7 +93,7 @@ class DataModule(LightningDataModule):
             video_transform=VideoTransform("val"),
         )
         sampler = ByFrameCountSampler(
-            val_ds, self.cfg.data.max_frames_val, shuffle=False
+            val_ds, self.cfg.data.max_frames_val, self.cfg.data.max_sentences, shuffle=False
         )
         if self.total_gpus > 1:
             sampler = DistributedSamplerWrapper(sampler, shuffle=False, drop_last=True)
@@ -111,5 +111,5 @@ class DataModule(LightningDataModule):
             ),
             video_transform=VideoTransform("test"),
         )
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=None)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=None, num_workers=self.cfg.num_workers)
         return dataloader

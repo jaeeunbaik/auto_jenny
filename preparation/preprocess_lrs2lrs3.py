@@ -12,6 +12,8 @@ from tqdm import tqdm
 from transforms import TextTransform
 from utils import save_vid_aud_txt, split_file
 
+import pdb
+
 warnings.filterwarnings("ignore")
 
 # Argument Parsing
@@ -114,8 +116,11 @@ dst_txt_dir = os.path.join(
 if dataset == "lrs3":
     if args.subset == "test":
         filenames = glob.glob(
-            os.path.join(args.data_dir, args.subset, "**", "*.mp4"), recursive=True
+            #os.path.join(args.data_dir, "**", "*.mp4"), recursive=True
+            #os.path.join(args.data_dir, args.subset, "**", "*.mp4"), recursive=True
+            os.path.join(args.data_dir, 'test_v0.4', "**", "*.mp4"), recursive=True      
         )
+        print(dataset, args.subset, len(filenames))
     elif args.subset == "train":
         filenames = glob.glob(
             os.path.join(args.data_dir, "trainval", "**", "*.mp4"), recursive=True
@@ -133,7 +138,8 @@ elif dataset == "lrs2":
         filenames = [
             os.path.join(args.data_dir, "main", _.split()[0] + ".mp4")
             for _ in open(
-                os.path.join(os.path.dirname(args.data_dir), args.subset) + ".txt"
+                #os.path.join(os.path.dirname(args.data_dir), args.subset) + ".txt"
+                os.path.join(args.data_dir, args.subset) + ".txt"
             )
             .read()
             .splitlines()
@@ -142,14 +148,16 @@ elif dataset == "lrs2":
         filenames = [
             os.path.join(args.data_dir, "main", _.split()[0] + ".mp4")
             for _ in open(
-                os.path.join(os.path.dirname(args.data_dir), args.subset) + ".txt"
+                #os.path.join(os.path.dirname(args.data_dir), args.subset) + ".txt"
+                os.path.join(args.data_dir, args.subset) + ".txt"
             )
             .read()
             .splitlines()
         ]
         pretrain_filenames = [
             os.path.join(args.data_dir, "pretrain", _.split()[0] + ".mp4")
-            for _ in open(os.path.join(os.path.dirname(args.data_dir), "pretrain.txt"))
+            #for _ in open(os.path.join(os.path.dirname(args.data_dir), "pretrain.txt"))
+            for _ in open(os.path.join(args.data_dir, "pretrain.txt"))
             .read()
             .splitlines()
         ]
@@ -160,9 +168,9 @@ elif dataset == "lrs2":
 
 unit = math.ceil(len(filenames) * 1.0 / args.groups)
 filenames = filenames[args.job_index * unit : (args.job_index + 1) * unit]
-
 for data_filename in tqdm(filenames):
     if args.landmarks_dir:
+        #landmarks_filename = data_filename.replace('/home/nas4/DB/[DB]_AVSR/original/LRS2_src', args.landmarks_dir)[:-4] + ".pkl" ## [] -> 파일명 땜시
         landmarks_filename = (
             data_filename.replace(args.data_dir, args.landmarks_dir)[:-4] + ".pkl"
         )
@@ -175,9 +183,12 @@ for data_filename in tqdm(filenames):
     except (UnboundLocalError, TypeError, OverflowError, AssertionError):
         continue
 
+
+    #pdb.set_trace()
     if os.path.normpath(data_filename).split(os.sep)[-3] in [
         "trainval",
-        "test",
+        "test_v0.4",
+        #"test",
         "main",
     ]:
         dst_vid_filename = (
@@ -313,4 +324,5 @@ for data_filename in tqdm(filenames):
                     f"{dataset},{basename},{trim_vid_data.shape[0]},{token_id_str}"
                 )
             )
+    
 f.close()

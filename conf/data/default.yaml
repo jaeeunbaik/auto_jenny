@@ -1,7 +1,8 @@
 defaults:
   - _self_
   - dataset: lrs3
-modality: video
+modality: audiovisual
 use_audio_normalise: False
-max_frames: 1800
+max_frames: 1000 #1800
 max_frames_val: 500
+max_sentences: #4 # default: 입력x

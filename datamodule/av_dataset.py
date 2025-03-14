@@ -74,6 +74,7 @@ class AVDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         dataset_name, rel_path, input_length, token_id = self.list[idx]
         path = os.path.join(self.root, dataset_name, rel_path)
+        #path = os.path.join(self.root, rel_path)
         if self.modality == "video":
             video = load_video(path)
             video = self.video_transform(video)

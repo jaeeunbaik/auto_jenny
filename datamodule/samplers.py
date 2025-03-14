@@ -10,9 +10,10 @@ from torch.utils.data.sampler import Sampler
 
 
 class ByFrameCountSampler(Sampler):
-    def __init__(self, dataset, max_frames_per_gpu, shuffle=True, seed=0):
+    def __init__(self, dataset, max_frames_per_gpu, max_batch_sentences, shuffle=True, seed=0):
         self.dataset = dataset
         self.max_frames_per_gpu = max_frames_per_gpu
+        self.max_batch_sentences = max_batch_sentences
         self.sizes = [item[2] for item in self.dataset.list]
 
         self.shuffle = shuffle
@@ -20,9 +21,10 @@ class ByFrameCountSampler(Sampler):
         self.epoch = 0
 
         batch_indices = data_utils.batch_by_size(
-            self._get_indices(), lambda i: self.sizes[i], max_tokens=max_frames_per_gpu
+            self._get_indices(), lambda i: self.sizes[i], max_tokens=max_frames_per_gpu, max_sentences=max_batch_sentences
         )
         self.num_batches = len(batch_indices)
+
 
     def _get_indices(self):
         if self.shuffle:  # shuffles indices corresponding to equal lengths
@@ -42,6 +44,7 @@ class ByFrameCountSampler(Sampler):
             self._get_indices(),
             lambda i: self.sizes[i],
             max_tokens=self.max_frames_per_gpu,
+            max_sentences=self.max_batch_sentences
         )
         return iter(batch_indices)
 

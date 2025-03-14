@@ -30,22 +30,21 @@ def average_checkpoints(last):
     return avg
 
 
-def ensemble(args):
-    last = [
-        os.path.join(args.exp_dir, args.exp_name, f"epoch={n}.ckpt")
-        for n in range(
-            args.trainer.max_epochs - args.checkpoint.save_top_k,
-            args.trainer.max_epochs,
-        )
-    ]
-    model_path = os.path.join(
-        args.exp_dir, args.exp_name, f"model_avg_{args.checkpoint.save_top_k}.pth"
-    )
+def ensemble():
+    path = ['/home/nas4/user/yh/auto_avsr/outputs/2023-09-06/20-14-46/lrs3/testaudio/epoch=70.ckpt']
+    #model_path = os.path.join(
+    #    args.exp_dir, args.exp_name, f"model_avg_{args.checkpoint.save_top_k}.pth"
+    #)
 
     model_path_last = os.path.join(
-        args.exp_dir, args.exp_name, f"model_last.pth"
+        '/home/nas4/user/yh/auto_avsr/outputs/2023-09-06/20-14-46/lrs3/testaudio', f"model_last.pth"
     )
 
-    torch.save(average_checkpoints(last), model_path)
-    torch.save(last_checkpoints(last[-1]), model_path_last)
-    return model_path
+    #torch.save(average_checkpoints(last), model_path)
+    torch.save(average_checkpoints(path), model_path_last)
+    return model_path_last
+
+print("start")
+
+temp = ensemble()
+print(temp)
