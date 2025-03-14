@@ -757,6 +757,23 @@ def snapshot_object(target, filename):
     return snapshot_object
 
 
+
+def print_model_weights(model_path):
+    """저장된 PyTorch 모델의 가중치 키값 확인"""
+    state_dict = torch.load(model_path, map_location=torch.device("cpu"))
+
+    # 만약 snapshot 체크포인트라면 "model" 키 안에 state_dict가 있음
+    if "model" in state_dict:
+        state_dict = state_dict["model"]
+
+    print("🔹 모델의 가중치 키값들:")
+    with open("result.txt", 'w') as f:
+        for key in state_dict.keys():
+            f.write(key)
+    f.close()
+
+
+
 def torch_load(path, model):
     """Load torch model states.
 
@@ -765,18 +782,19 @@ def torch_load(path, model):
         model (torch.nn.Module): Torch model.
 
     """
+    print_model_weights(path)
     if "snapshot" in os.path.basename(path):
         model_state_dict = torch.load(path, map_location=lambda storage, loc: storage)[
             "model"
         ]
-    else:
+    else: # 여기임 ~!
         model_state_dict = torch.load(path, map_location=lambda storage, loc: storage)
 
     if hasattr(model, "module"):
         model.module.load_state_dict(model_state_dict)
     else:
         model.load_state_dict(model_state_dict)
-
+        
     del model_state_dict
 
 

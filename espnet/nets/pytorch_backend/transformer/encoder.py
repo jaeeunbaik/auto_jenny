@@ -40,7 +40,7 @@ from espnet.nets.pytorch_backend.transformer.raw_embeddings import (
 from espnet.nets.pytorch_backend.transformer.repeat import repeat
 from espnet.nets.pytorch_backend.transformer.subsampling import Conv2dSubsampling
 
-
+from espnet.nets.pytorch_backend.transformer.emformer import Emformer
 def _pre_hook(
     state_dict,
     prefix,
@@ -91,10 +91,10 @@ class Encoder(torch.nn.Module):
         attention_heads=4,
         linear_units=2048,
         num_blocks=6,
+        input_layer="conv2d",
         dropout_rate=0.1,
         positional_dropout_rate=0.1,
         attention_dropout_rate=0.0,
-        input_layer="conv2d",
         pos_enc_class=PositionalEncoding,
         normalize_before=True,
         concat_after=False,
@@ -155,7 +155,7 @@ class Encoder(torch.nn.Module):
                 input_layer,
                 pos_enc_class(attention_dim, positional_dropout_rate),
             )
-        elif input_layer in ["conv1d", "conv3d"]:
+        elif input_layer in ["conv1d", "conv3d"]:  ##
             self.embed = torch.nn.Sequential(
                 torch.nn.Linear(512, attention_dim),
                 pos_enc_class(attention_dim, positional_dropout_rate),
@@ -214,26 +214,42 @@ class Encoder(torch.nn.Module):
         else:
             raise ValueError("unknown encoder_attn_layer: " + encoder_attn_layer)
 
-        convolution_layer = ConvolutionModule
-        convolution_layer_args = (attention_dim, cnn_module_kernel)
+#########################################
+        # convolution_layer = ConvolutionModule
+        # convolution_layer_args = (attention_dim, cnn_module_kernel)
 
-        self.encoders = repeat(
-            num_blocks,
-            lambda: EncoderLayer(
-                attention_dim,
-                encoder_attn_layer(*encoder_attn_layer_args),
-                positionwise_layer(*positionwise_layer_args),
-                convolution_layer(*convolution_layer_args) if use_cnn_module else None,
-                dropout_rate,
-                normalize_before,
-                concat_after,
-                macaron_style,
-            ),
+        # self.encoders = repeat(
+        #    num_blocks,
+        #    lambda: EncoderLayer(
+        #        attention_dim,
+        #        encoder_attn_layer(*encoder_attn_layer_args),
+        #        positionwise_layer(*positionwise_layer_args),
+        #        convolution_layer(*convolution_layer_args) if use_cnn_module else None,
+        #        dropout_rate,
+        #        normalize_before,
+        #        concat_after,
+        #        macaron_style,
+        #    ),
+        # )
+        self.emformer = Emformer(
+                input_dim=attention_dim,
+                num_heads=attention_heads,
+                ffn_dim=linear_units,
+                num_layers=num_blocks,
+                segment_length=96,
+                dropout=0.1,
+                activation="gelu",
+                left_context_length=40,
+                right_context_length=0,
+                max_memory_size=0,
+                weight_init_scale_strategy="depthwise",
+                tanh_on_mem=True,
+                negative_inf=-1e8,
         )
         if self.normalize_before:
             self.after_norm = LayerNorm(attention_dim)
 
-    def forward(self, xs, masks, extract_resnet_feats=False):
+    def forward(self, xs, masks, lengths, extract_resnet_feats=False):
         """Encode input sequence.
 
         :param torch.Tensor xs: input tensor
@@ -252,8 +268,8 @@ class Encoder(torch.nn.Module):
         else:
             xs = self.embed(xs)
 
-        xs, masks = self.encoders(xs, masks)
-
+        # xs, masks = self.encoders(xs, masks)  # transformer / conformer
+        xs, masks = self.emformer(xs, lengths)
         if isinstance(xs, tuple):
             xs = xs[0]
 

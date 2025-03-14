@@ -31,7 +31,7 @@ from espnet.nets.pytorch_backend.transformer.label_smoothing_loss import (
 )
 from espnet.nets.pytorch_backend.transformer.mask import target_mask
 from espnet.nets.scorers.ctc import CTCPrefixScorer
-
+from espnet.nets.pytorch_backend.nets_utils import MLPHead
 
 class E2E(torch.nn.Module):
     @property
@@ -59,8 +59,7 @@ class E2E(torch.nn.Module):
             )
 
         idim = 80
-
-        self.encoder = Encoder(
+        self.encoder = Encoder( # visual
             idim=idim,
             attention_dim=args.adim,
             attention_heads=args.aheads,
@@ -78,13 +77,40 @@ class E2E(torch.nn.Module):
             a_upsample_ratio=args.a_upsample_ratio,
             relu_type=getattr(args, "relu_type", "swish"),
         )
-
         self.transformer_input_layer = args.transformer_input_layer
         self.a_upsample_ratio = args.a_upsample_ratio
 
         self.proj_decoder = None
         if args.adim != args.ddim:
             self.proj_decoder = torch.nn.Linear(args.adim, args.ddim)
+
+        self.aux_encoder = Encoder(
+            idim=idim,
+            attention_dim=args.aux_adim,
+            attention_heads=args.aux_aheads,
+            linear_units=args.aux_eunits,
+            num_blocks=args.aux_elayers,
+            input_layer=args.aux_transformer_input_layer,
+            dropout_rate=args.aux_dropout_rate,
+            positional_dropout_rate=args.aux_dropout_rate,
+            attention_dropout_rate=args.aux_transformer_attn_dropout_rate,
+            encoder_attn_layer_type=args.aux_transformer_encoder_attn_layer_type,
+            macaron_style=args.aux_macaron_style,
+            use_cnn_module=args.aux_use_cnn_module,
+            cnn_module_kernel=args.aux_cnn_module_kernel,
+            zero_triu=getattr(args, "aux_zero_triu", False),
+            a_upsample_ratio=args.aux_a_upsample_ratio,
+            relu_type=getattr(args, "aux_relu_type", "swish"),
+        )
+        self.aux_transformer_input_layer = args.aux_transformer_input_layer
+
+        self.fusion = MLPHead(
+            idim=args.adim + args.aux_adim,
+            hdim=args.fusion_hdim,
+            odim=args.adim,
+            norm=args.fusion_norm,
+        )
+
 
         if args.mtlalpha < 1:
             self.decoder = Decoder(
@@ -128,24 +154,32 @@ class E2E(torch.nn.Module):
         """Scorers."""
         return dict(decoder=self.decoder, ctc=CTCPrefixScorer(self.ctc, self.eos))
 
-    def forward(self, x, lengths, label):
-        if self.transformer_input_layer == "conv1d":
-            lengths = torch.div(lengths, 640, rounding_mode="trunc")
-        padding_mask = make_non_pad_mask(lengths).to(x.device).unsqueeze(-2)
+    def forward(self, x, aux_x, lengths, aux_lengths, label):
+        #if self.transformer_input_layer == "conv1d":
+        #    lengths = torch.div(lengths, 640, rounding_mode="trunc")
+        
+        aux_lengths = torch.div(aux_lengths, 640, rounding_mode="trunc")
+        aux_padding_mask = make_non_pad_mask(aux_lengths).to(aux_x.device).unsqueeze(-2) # audio padding
+
+        padding_mask = make_non_pad_mask(lengths).to(x.device).unsqueeze(-2) # visual padding
 
         #x, _ = self.encoder(x, padding_mask)
-        x, _ = self.encoder(x, padding_mask, lengths)
+        x, _ = self.encoder(x, padding_mask, lengths) # emformer
+        #aux_x, _ = self.aux_encoder(aux_x, aux_padding_mask)
+        aux_x, _ = self.aux_encoder(aux_x, aux_padding_mask, aux_lengths) # emformer
+
+        fus_output = self.fusion(torch.cat((x, aux_x), dim=-1))
 
         # ctc loss
-        loss_ctc, ys_hat = self.ctc(x, lengths, label)
+        loss_ctc, ys_hat = self.ctc(fus_output, lengths, label)
 
         if self.proj_decoder:
-            x = self.proj_decoder(x)
+            fus_output = self.proj_decoder(fus_output)
 
         # decoder loss
         ys_in_pad, ys_out_pad = add_sos_eos(label, self.sos, self.eos, self.ignore_id)
         ys_mask = target_mask(ys_in_pad, self.ignore_id)
-        pred_pad, _ = self.decoder(ys_in_pad, ys_mask, x, padding_mask)
+        pred_pad, _ = self.decoder(ys_in_pad, ys_mask, fus_output, padding_mask)
         loss_att = self.criterion(pred_pad, ys_out_pad)
         loss = self.mtlalpha * loss_ctc + (1 - self.mtlalpha) * loss_att
 
