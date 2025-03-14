@@ -2,4 +2,7 @@ defaults:
   - _self_
   - visual_backbone: resnet_conformer
   - audio_backbone: resnet_conformer
+  - audiovisual_backbone: resnet_conformer
   - language_model: default
+  - audiovisual_teacher: resnet_emformer
+  - audiovisual_student: resnet_emformer
